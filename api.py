@@ -88,6 +88,9 @@ def keyword_match_count(text, keyword_list, check_qr=False, pdf_path=None):
             or keyword_words.issubset(text_words)
         ):
             matched += 1
+        
+        if keyword.lower() == 'salary slip' or keyword.lower() == 'bank statement':
+            matched += 3
 
     if check_qr and pdf_path and detect_qr_in_pdf(pdf_path):
         matched += 1
