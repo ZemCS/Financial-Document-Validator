@@ -95,9 +95,26 @@ def keyword_match_count(text, keyword_list, check_qr=False, pdf_path=None):
     return matched
 
 
+def is_pdf_modified(pdf_path):
+    try:
+        reader = PdfReader(pdf_path)
+        metadata = reader.metadata
+
+        creation_date = metadata.get("/CreationDate")
+        mod_date = metadata.get("/ModDate")
+
+        if creation_date and mod_date and creation_date != mod_date:
+            return True, creation_date, mod_date
+        else:
+            return False, creation_date, mod_date
+    except Exception as e:
+        return False, None, f"Metadata error: {e}"
+
+
 def get_text_from_pdf(pdf_path):
-    is_scanned = is_scanned_pdf(pdf_path)
-    return extract_text_with_ocr(pdf_path) if is_scanned else extract_text_from_pdf(pdf_path)
+    scanned = is_scanned_pdf(pdf_path)
+    text = extract_text_with_ocr(pdf_path) if scanned else extract_text_from_pdf(pdf_path)
+    return text, scanned
 
 
 @app.route('/classify/bank-statement', methods=['POST'])
@@ -110,10 +127,20 @@ def classify_bank_statement():
     file.save(pdf_path)
 
     try:
-        text = get_text_from_pdf(pdf_path)
+        text, scanned = get_text_from_pdf(pdf_path)
         match_count = keyword_match_count(text, bank_keywords, check_qr=True, pdf_path=pdf_path)
         classification = "Bank Statement" if match_count >= THRESHOLD_BANK else "Other"
-        return jsonify({"classification": classification, "match_count": match_count})
+
+        was_modified, created, modified = is_pdf_modified(pdf_path)
+
+        return jsonify({
+            "classification": classification,
+            "match_count": match_count,
+            "scanned": scanned,
+            "pdf_modified": was_modified,
+            "creation_date": created,
+            "modification_date": modified
+        })
     finally:
         os.remove(pdf_path)
 
@@ -128,10 +155,20 @@ def classify_salary_slip():
     file.save(pdf_path)
 
     try:
-        text = get_text_from_pdf(pdf_path)
+        text, scanned = get_text_from_pdf(pdf_path)
         match_count = keyword_match_count(text, salary_keywords, check_qr=False)
         classification = "Salary Slip" if match_count >= THRESHOLD_SALARY else "Other"
-        return jsonify({"classification": classification, "match_count": match_count})
+
+        was_modified, created, modified = is_pdf_modified(pdf_path)
+
+        return jsonify({
+            "classification": classification,
+            "match_count": match_count,
+            "scanned": scanned,
+            "pdf_modified": was_modified,
+            "creation_date": created,
+            "modification_date": modified
+        })
     finally:
         os.remove(pdf_path)
 
